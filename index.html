@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dominoes Scorekeeper Online v2</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --card: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --border: #374151;
+      --green: #22c55e;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --yellow: #facc15;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 12px;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 10px 0 4px;
+      font-size: 24px;
+    }
+
+    .version {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    .room-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input, button {
+      border: none;
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 15px;
+    }
+
+    input {
+      background: #0f172a;
+      color: white;
+      border: 1px solid var(--border);
+      width: 100%;
+    }
+
+    button {
+      background: var(--blue);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button.secondary { background: #4b5563; }
+    button.danger { background: var(--red); }
+    button.success { background: var(--green); }
+
+    #roomStatus {
+      margin-top: 10px;
+      font-weight: bold;
+      color: var(--red);
+      text-align: center;
+      padding: 8px;
+      border-radius: 10px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+    }
+
+    #roomStatus.joined {
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tabs button {
+      background: #374151;
+    }
+
+    .tabs button.active {
+      background: var(--green);
+      color: #052e16;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 650px;
+      width: 100%;
+      background: #0f172a;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px;
+      text-align: center;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #111827;
+      z-index: 1;
+    }
+
+    th input {
+      text-align: center;
+      font-weight: bold;
+      padding: 8px;
+    }
+
+    td input {
+      text-align: center;
+      width: 80px;
+      padding: 8px;
+    }
+
+    .total-row td {
+      font-weight: bold;
+      background: #1e293b;
+      color: var(--yellow);
+    }
+
+    .winner {
+      outline: 3px solid var(--green);
+      background: rgba(34,197,94,0.15) !important;
+    }
+
+    .hidden { display: none; }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.4;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 650px) {
+      .room-row {
+        grid-template-columns: 1fr;
+      }
+      .actions {
+        grid-template-columns: 1fr;
+      }
+      h1 { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Dominoes Scorekeeper</h1>
+  <div class="version">Online Room Version 2</div>
+
+  <div class="card">
+    <div class="room-row">
+      <input id="roomCode" placeholder="Enter room code e.g. familygame" />
+      <button onclick="joinRoom()">Join Room</button>
+      <button class="danger" onclick="leaveRoom()">Leave Room</button>
+    </div>
+    <div id="roomStatus">🔴 Not in a room</div>
+    <div class="small-note">Only people using the same room code will share the same scores.</div>
+  </div>
+
+  <div class="tabs">
+    <button id="tabChinese" class="active" onclick="switchTab('chinese')">Chinese Dominoes</button>
+    <button id="tabNormal" onclick="switchTab('normal')">Normal Dominoes</button>
+  </div>
+
+  <div id="chinesePanel" class="card">
+    <h2>Chinese Dominoes</h2>
+    <div class="table-wrap">
+      <table id="chineseTable"></table>
+    </div>
+    <div class="actions">
+      <button onclick="addRow('chinese')">Add Row</button>
+      <button class="danger" onclick="deleteLastRow('chinese')">Delete Last Row</button>
+      <button class="secondary" onclick="resetCurrentGame('chinese')">Reset Chinese</button>
+    </div>
+  </div>
+
+  <div id="normalPanel" class="card hidden">
+    <h2>Normal Dominoes</h2>
+    <div class="table-wrap">
+      <table id="normalTable"></table>
+    </div>
+    <div class="actions">
+      <button onclick="addRow('normal')">Add Row</button>
+      <button class="danger" onclick="deleteLastRow('normal')">Delete Last Row</button>
+      <button class="secondary" onclick="resetCurrentGame('normal')">Reset Normal</button>
+    </div>
+  </div>
+
+  <script type="module">
+    /************************************************************
+     * 1) FIREBASE CODE GOES HERE
+     * Replace firebaseConfig below with your own Firebase config.
+     ************************************************************/
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+    import { getDatabase, ref, set, onValue, off, get } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAHs5j6Q8_IBXYqDE7iKQzRxsNrGDnwkz8",
+      authDomain: "dominoesscorekeeper-f0bb3.firebaseapp.com",
+      databaseURL: "https://dominoesscorekeeper-f0bb3-default-rtdb.firebaseio.com",
+      projectId: "dominoesscorekeeper-f0bb3",
+      storageBucket: "dominoesscorekeeper-f0bb3.firebasestorage.app",
+      messagingSenderId: "106982843189",
+      appId: "1:106982843189:web:f60919a005655118dc227c",
+      measurementId: "G-SE9QZTRTKF"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+
+    /************************************************************
+     * 2) APP DATA
+     ************************************************************/
+    let currentRoom = null;
+    let currentRoomRef = null;
+    let activeTab = "chinese";
+    let isLoadingRemote = false;
+
+    let scoreData = {
+      chinese: {
+        players: ["G", "A", "E", "GJ"],
+        rows: ["6", "5", "4", "3", "2", "1", "0"],
+        scores: []
+      },
+      normal: {
+        players: ["G", "A", "E", "GJ"],
+        rows: ["Round 1", "Round 2", "Round 3", "Round 4", "Round 5"],
+        scores: []
+      }
+    };
+
+    function ensureScores() {
+      ["chinese", "normal"].forEach(game => {
+        const rowCount = scoreData[game].rows.length;
+        const playerCount = scoreData[game].players.length;
+        if (!scoreData[game].scores) scoreData[game].scores = [];
+        for (let r = 0; r < rowCount; r++) {
+          if (!scoreData[game].scores[r]) scoreData[game].scores[r] = [];
+          for (let c = 0; c < playerCount; c++) {
+            if (scoreData[game].scores[r][c] === undefined) scoreData[game].scores[r][c] = "";
+          }
+        }
+      });
+    }
+
+    /************************************************************
+     * 3) ROOM FUNCTIONS
+     ************************************************************/
+    window.joinRoom = async function () {
+      const roomInput = document.getElementById("roomCode").value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, "");
+
+      if (!roomInput) {
+        alert("Enter a room code first. Example: familygame");
+        return;
+      }
+
+      if (currentRoomRef) {
+        off(currentRoomRef);
+      }
+
+      currentRoom = roomInput;
+      currentRoomRef = ref(database, "rooms/" + currentRoom);
+
+      setRoomStatus(true);
+
+      const snapshot = await get(currentRoomRef);
+      if (!snapshot.exists()) {
+        ensureScores();
+        await set(currentRoomRef, scoreData);
+      }
+
+      onValue(currentRoomRef, snapshot => {
+        if (snapshot.exists()) {
+          isLoadingRemote = true;
+          scoreData = snapshot.val();
+          ensureScores();
+          renderAllTables();
+          isLoadingRemote = false;
+        }
+      });
+    };
+
+    window.leaveRoom = function () {
+      if (currentRoomRef) {
+        off(currentRoomRef);
+      }
+      currentRoom = null;
+      currentRoomRef = null;
+      setRoomStatus(false);
+    };
+
+    function setRoomStatus(joined) {
+      const status = document.getElementById("roomStatus");
+      if (joined) {
+        status.innerHTML = "🟢 Joined room: <b>" + currentRoom + "</b>";
+        status.classList.add("joined");
+      } else {
+        status.innerHTML = "🔴 Not in a room";
+        status.classList.remove("joined");
+      }
+    }
+
+    function saveRoomData() {
+      if (!currentRoom || !currentRoomRef) {
+        alert("You are not in a room. Join a room first.");
+        return;
+      }
+      if (isLoadingRemote) return;
+      set(currentRoomRef, scoreData);
+    }
+
+    /************************************************************
+     * 4) TABLE FUNCTIONS
+     ************************************************************/
+    function renderAllTables() {
+      renderTable("chinese");
+      renderTable("normal");
+    }
+
+    function renderTable(game) {
+      ensureScores();
+
+      const table = document.getElementById(game + "Table");
+      const data = scoreData[game];
+      const totals = getTotals(game);
+      const winningTotal = Math.min(...totals);
+
+      let html = "<thead><tr><th>Row</th>";
+      data.players.forEach((player, index) => {
+        html += `<th><input value="${escapeHtml(player)}" onchange="updatePlayer('${game}', ${index}, this.value)"></th>`;
+      });
+      html += "<th>Delete</th></tr></thead><tbody>";
+
+      data.rows.forEach((rowName, rowIndex) => {
+        html += "<tr>";
+        html += `<td><input value="${escapeHtml(rowName)}" onchange="updateRowName('${game}', ${rowIndex}, this.value)"></td>`;
+
+        data.players.forEach((player, playerIndex) => {
+          const value = data.scores[rowIndex]?.[playerIndex] ?? "";
+          const isWinnerCol = totals[playerIndex] === winningTotal && totals[playerIndex] > 0;
+          html += `<td class="${isWinnerCol ? "winner" : ""}"><input type="number" inputmode="numeric" value="${value}" onchange="updateScore('${game}', ${rowIndex}, ${playerIndex}, this.value)"></td>`;
+        });
+
+        html += `<td><button class="danger" onclick="deleteRow('${game}', ${rowIndex})">X</button></td>`;
+        html += "</tr>";
+      });
+
+      html += `<tr class="total-row"><td>Total</td>`;
+      totals.forEach(total => html += `<td>${total}</td>`);
+      html += "<td></td></tr>";
+
+      html += "</tbody>";
+      table.innerHTML = html;
+    }
+
+    function getTotals(game) {
+      const data = scoreData[game];
+      return data.players.map((_, playerIndex) => {
+        return data.scores.reduce((sum, row) => {
+          const val = parseInt(row[playerIndex], 10);
+          return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+      });
+    }
+
+    window.updatePlayer = function (game, playerIndex, value) {
+      scoreData[game].players[playerIndex] = value || "Player " + (playerIndex + 1);
+      renderTable(game);
+      saveRoomData();
+    };
+
+    window.updateRowName = function (game, rowIndex, value) {
+      scoreData[game].rows[rowIndex] = value || "Row " + (rowIndex + 1);
+      renderTable(game);
+      saveRoomData();
+    };
+
+    window.updateScore = function (game, rowIndex, playerIndex, value) {
+      scoreData[game].scores[rowIndex][playerIndex] = value;
+      renderTable(game);
+      saveRoomData();
+    };
+
+    window.addRow = function (game) {
+      scoreData[game].rows.push("Round " + (scoreData[game].rows.length + 1));
+      scoreData[game].scores.push(["", "", "", ""]);
+      renderTable(game);
+      saveRoomData();
+    };
+
+    window.deleteRow = function (game, rowIndex) {
+      if (!confirm("Delete this row?")) return;
+      scoreData[game].rows.splice(rowIndex, 1);
+      scoreData[game].scores.splice(rowIndex, 1);
+      renderTable(game);
+      saveRoomData();
+    };
+
+    window.deleteLastRow = function (game) {
+      if (scoreData[game].rows.length === 0) return;
+      scoreData[game].rows.pop();
+      scoreData[game].scores.pop();
+      renderTable(game);
+      saveRoomData();
+    };
+
+    window.resetCurrentGame = function (game) {
+      if (!confirm("Reset " + game + " scores?")) return;
+      scoreData[game].scores = scoreData[game].rows.map(() => ["", "", "", ""]);
+      renderTable(game);
+      saveRoomData();
+    };
+
+    /************************************************************
+     * 5) TAB FUNCTIONS
+     ************************************************************/
+    window.switchTab = function (tab) {
+      activeTab = tab;
+
+      document.getElementById("chinesePanel").classList.toggle("hidden", tab !== "chinese");
+      document.getElementById("normalPanel").classList.toggle("hidden", tab !== "normal");
+
+      document.getElementById("tabChinese").classList.toggle("active", tab === "chinese");
+      document.getElementById("tabNormal").classList.toggle("active", tab === "normal");
+    };
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    ensureScores();
+    renderAllTables();
+  </script>
+</body>
+</html>
