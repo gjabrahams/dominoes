@@ -1,0 +1,497 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dominoes Scorekeeper v49 Online Fixed</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial;margin:0;background:#f7f7f7;color:#111}
+h2{text-align:center;margin:10px 0}
+.box{background:#fff;border:2px solid #111;border-radius:10px;margin:8px;padding:8px}
+.status{font-size:13px;text-align:center;margin-top:8px}
+.room-ok{background:#dcfce7;color:#166534;border:2px solid #16a34a;border-radius:8px;padding:8px;font-weight:bold}
+.room-bad{background:#fee2e2;color:#991b1b;border:2px solid #ef4444;border-radius:8px;padding:8px;font-weight:bold}
+.tabs,.btns,.quick{display:grid;gap:8px;margin:8px}
+.tabs{grid-template-columns:1fr 1fr}
+.quick{grid-template-columns:repeat(3,1fr)}
+.btns{grid-template-columns:repeat(3,1fr)}
+button{min-height:48px;border-radius:10px;border:1px solid #ccc;background:#fff;color:#143d86;font-weight:bold;font-size:14px}
+.active,.blue{background:#4388df!important;color:#fff}
+.green{background:#16a34a!important;color:#fff}
+.red{background:#ef4444!important;color:#fff}
+.orange{background:#f59e0b!important;color:#fff}
+table{width:100%;border-collapse:collapse;background:#fff}
+th,td{border:2px solid #111;text-align:center;height:52px;font-size:18px}
+thead th{position:sticky;top:0;background:#fff;z-index:2}
+input{width:100%;height:100%;border:0;text-align:center;font-size:18px;background:transparent}
+.room-input{height:44px;border:1px solid #ccc;border-radius:8px;padding:8px;text-align:left}
+.num{color:red;font-weight:bold}
+.sel{outline:4px solid #4388df;outline-offset:-4px;background:#eaf2ff!important}
+.hide{display:none}
+.note{text-align:center;color:#666;font-size:12px;margin:8px}
+</style>
+</head>
+<body>
+
+<h2>Dominoes Scorekeeper</h2>
+
+<div class="box">
+  <b>Online Shared Room</b>
+  <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px">
+    <input id="room" class="room-input" placeholder="Room code e.g. FAMILY01">
+    <button class="blue" onclick="joinRoom()">Join</button>
+  </div>
+  <div class="btns">
+    <button onclick="newRoom()">New Room</button>
+    <button onclick="copyLink()">Copy Link</button>
+    <button onclick="saveNow()">Save</button>
+  </div>
+  <div id="status" class="status room-bad">🔴 Not in a room — local only</div>
+</div>
+
+<div class="tabs">
+  <button id="tabC" class="active" onclick="modeSet('c')">Dominoes Scorekeeper</button>
+  <button id="tabN" onclick="modeSet('n')">Normal Dominoes</button>
+</div>
+
+<div id="chinese">
+<table>
+<thead>
+<tr>
+<th><input id="chName" value="Chinese"></th>
+<th><input data-ch="0" value="P1"></th>
+<th><input data-ch="1" value="P2"></th>
+<th><input data-ch="2" value="P3"></th>
+<th><input data-ch="3" value="P4"></th>
+</tr>
+</thead>
+<tbody id="chBody"></tbody>
+<tfoot>
+<tr><td>Total</td><td id="ct0">0</td><td id="ct1">0</td><td id="ct2">0</td><td id="ct3">0</td></tr>
+<tr><td>Rank</td><td id="cr0">-</td><td id="cr1">-</td><td id="cr2">-</td><td id="cr3">-</td></tr>
+</tfoot>
+</table>
+</div>
+
+<div id="normal" class="hide">
+<table>
+<thead>
+<tr>
+<th><input id="nName" value="Double 6?"></th>
+<th><input data-n="0" value="Team 1"></th>
+<th><input data-n="1" value="Team 2"></th>
+<th>Del</th>
+</tr>
+</thead>
+<tbody id="nBody"></tbody>
+<tfoot>
+<tr><td>Total</td><td id="nt0">0</td><td id="nt1">0</td><td></td></tr>
+<tr><td>Rank</td><td id="nr0">-</td><td id="nr1">-</td><td></td></tr>
+</tfoot>
+</table>
+</div>
+
+<div class="quick">
+<button onclick="dig(0)">0</button><button onclick="dig(1)">1</button><button onclick="dig(2)">2</button>
+<button onclick="dig(3)">3</button><button onclick="dig(4)">4</button><button onclick="dig(5)">5</button>
+<button onclick="dig(6)">6</button><button onclick="dig(7)">7</button><button onclick="dig(8)">8</button>
+<button onclick="dig(9)">9</button><button onclick="back()">⌫</button><button class="red" onclick="cellClear()">Clear</button>
+</div>
+
+<div class="btns">
+<button onclick="clearTab()">Clear Tab</button>
+<button onclick="addRow()">Add Row</button>
+<button class="orange" onclick="undoDel()">Undo</button>
+<button class="green" onclick="shareImg()">Share</button>
+<button class="blue" onclick="downloadImg()">Download</button>
+</div>
+
+<div class="note">Version 49 Online Fixed · Green = joined room · Red = not in room</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAHs5j6Q8_IBXYqDE7iKQzRxsNrGDnwkz8",
+  authDomain: "dominoesscorekeeper-f0bb3.firebaseapp.com",
+  databaseURL: "https://dominoesscorekeeper-f0bb3-default-rtdb.firebaseio.com",
+  projectId: "dominoesscorekeeper-f0bb3",
+  storageBucket: "dominoesscorekeeper-f0bb3.firebasestorage.app",
+  messagingSenderId: "106982843189",
+  appId: "1:106982843189:web:f60919a005655118dc227c",
+  measurementId: "G-SE9QZTRTKF"
+};
+
+let db=null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db=firebase.database();
+}catch(e){
+  document.getElementById("status").className="status room-bad";
+  document.getElementById("status").innerText="🔴 Firebase error — check config/database";
+}
+
+let mode="c";
+let sel=null;
+let lastDel=null;
+let roomRef=null;
+let currentRoom="";
+let online=false;
+let applyingRemote=false;
+
+let ch={
+  name:"Chinese",
+  heads:["P1","P2","P3","P4"],
+  rows:[6,5,4,3,2,1,0].map(x=>({name:String(x),v:["","","",""]}))
+};
+
+let n={
+  name:"Double 6?",
+  heads:["Team 1","Team 2"],
+  rows:[1,2,3,4,5].map(x=>({name:String(x),v:["",""]}))
+};
+
+function getState(){
+  return {mode:mode,ch:ch,n:n,updatedAt:Date.now()};
+}
+
+function saveLocal(){
+  localStorage.setItem("dominoes_v49_local",JSON.stringify(getState()));
+}
+
+function sync(){
+  saveLocal();
+  if(online && roomRef && !applyingRemote){
+    roomRef.set(getState());
+  }
+}
+
+function applyState(s){
+  if(!s)return;
+  applyingRemote=true;
+  mode=s.mode||mode;
+  ch=s.ch||ch;
+  n=s.n||n;
+  n.name="Double 6?";
+  modeSet(mode,false);
+  applyingRemote=false;
+}
+
+function roomClean(code){
+  return String(code||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");
+}
+
+function joinRoom(){
+  const code=roomClean(document.getElementById("room").value);
+  if(!code){alert("Enter a room code");return;}
+  if(!db){alert("Firebase database is not available");return;}
+
+  currentRoom=code;
+  online=true;
+  roomRef=db.ref("rooms/"+currentRoom);
+
+  const status=document.getElementById("status");
+  status.className="status room-ok";
+  status.innerText="🟢 Joined room: "+currentRoom;
+
+  roomRef.off();
+  roomRef.on("value",snap=>{
+    const data=snap.val();
+    if(data){
+      applyState(data);
+    }else{
+      roomRef.set(getState());
+    }
+  });
+
+  const url=new URL(location.href);
+  url.searchParams.set("room",currentRoom);
+  history.replaceState(null,"",url);
+}
+
+function newRoom(){
+  document.getElementById("room").value="ROOM"+Math.floor(100000+Math.random()*900000);
+  joinRoom();
+}
+
+async function copyLink(){
+  const code=currentRoom || roomClean(document.getElementById("room").value);
+  if(!code){alert("Join or create a room first");return;}
+  const url=new URL(location.href);
+  url.searchParams.set("room",code);
+  await navigator.clipboard.writeText(url.toString());
+  alert("Room link copied");
+}
+
+function saveNow(){
+  sync();
+  alert(online ? "Saved to room: "+currentRoom : "Saved locally");
+}
+
+function modeSet(m,doSync=true){
+  mode=m;
+  sel=null;
+  document.getElementById("chinese").classList.toggle("hide",m!=="c");
+  document.getElementById("normal").classList.toggle("hide",m!=="n");
+  document.getElementById("tabC").classList.toggle("active",m==="c");
+  document.getElementById("tabN").classList.toggle("active",m==="n");
+  render();
+  if(doSync)sync();
+}
+
+function render(){
+  renderChinese();
+  renderNormal();
+  highlight();
+}
+
+function renderChinese(){
+  document.getElementById("chName").value=ch.name;
+  document.querySelectorAll("[data-ch]").forEach(e=>e.value=ch.heads[Number(e.dataset.ch)]||"");
+  const b=document.getElementById("chBody");
+  b.innerHTML="";
+  ch.rows.forEach((r,ri)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML='<td class="num">'+r.name+'</td>'+
+      ch.heads.map((_,ci)=>'<td id="c-'+ri+'-'+ci+'" onclick="pick(\\'c\\','+ri+','+ci+')"><input readonly value="'+(r.v[ci]||'')+'"></td>').join("");
+    b.appendChild(tr);
+  });
+  calc("c",ch,false);
+}
+
+function renderNormal(){
+  n.name="Double 6?";
+  document.getElementById("nName").value="Double 6?";
+  document.querySelectorAll("[data-n]").forEach(e=>e.value=n.heads[Number(e.dataset.n)]||"");
+  const b=document.getElementById("nBody");
+  b.innerHTML="";
+  n.rows.forEach((r,ri)=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML='<td class="num">'+(ri+1)+'</td>'+
+      n.heads.map((_,ci)=>{
+        const bg=Number(r.v[ci])>=5?'background:#bbf7d0':'';
+        return '<td style="'+bg+'" id="n-'+ri+'-'+ci+'" onclick="pick(\\'n\\','+ri+','+ci+')"><input readonly value="'+(r.v[ci]||'')+'"></td>';
+      }).join("")+
+      '<td><button class="red" onclick="delRow('+ri+')">×</button></td>';
+    b.appendChild(tr);
+  });
+  calc("n",n,true);
+}
+
+function ranks(arr){
+  const sorted=arr.map((score,i)=>({score,i})).sort((a,b)=>a.score-b.score);
+  const r=[];
+  let cr=1;
+  for(let i=0;i<sorted.length;i++){
+    if(i>0 && sorted[i].score!==sorted[i-1].score)cr=i+1;
+    r[sorted[i].i]=cr;
+  }
+  return r;
+}
+
+function suffix(x){
+  if(x===1)return"1st";
+  if(x===2)return"2nd";
+  if(x===3)return"3rd";
+  return x+"th";
+}
+
+function calc(prefix,data,reverse){
+  const t=Array(data.heads.length).fill(0);
+  data.rows.forEach(r=>r.v.forEach((x,i)=>t[i]+=Number(x)||0));
+  const mn=Math.min(...t);
+  const mx=Math.max(...t);
+  const rk=ranks(t);
+
+  t.forEach((x,i)=>{
+    const te=document.getElementById(prefix+"t"+i);
+    const re=document.getElementById(prefix+"r"+i);
+    te.innerText=x;
+    const ratio=mx===mn?0.5:(x-mn)/(mx-mn);
+    const hue=reverse?ratio*120:120-(ratio*120);
+    te.style.backgroundColor=`hsl(${hue},85%,78%)`;
+    te.style.boxShadow=rk[i]===1?"inset 0 0 0 4px #16a34a":"none";
+    re.innerText=suffix(rk[i]);
+    re.style.color=rk[i]===1?"green":"#111";
+  });
+}
+
+function pick(m,r,c){
+  sel={m,r,c};
+  highlight();
+}
+
+function highlight(){
+  document.querySelectorAll("td").forEach(td=>td.classList.remove("sel"));
+  if(sel){
+    const e=document.getElementById(sel.m+"-"+sel.r+"-"+sel.c);
+    if(e)e.classList.add("sel");
+  }
+}
+
+function activeData(){
+  return mode==="c"?ch:n;
+}
+
+function dig(x){
+  if(!sel || sel.m!==mode){alert("Tap a score cell first");return;}
+  const d=activeData();
+  const cur=String(d.rows[sel.r].v[sel.c]||"");
+  if(cur.length>=3)return;
+  d.rows[sel.r].v[sel.c]=cur+String(x);
+  render();
+  sync();
+}
+
+function back(){
+  if(!sel || sel.m!==mode){alert("Tap a score cell first");return;}
+  const d=activeData();
+  const cur=String(d.rows[sel.r].v[sel.c]||"");
+  d.rows[sel.r].v[sel.c]=cur.slice(0,-1);
+  render();
+  sync();
+}
+
+function cellClear(){
+  if(!sel || sel.m!==mode){alert("Tap a score cell first");return;}
+  activeData().rows[sel.r].v[sel.c]="";
+  render();
+  sync();
+}
+
+function clearTab(){
+  const d=activeData();
+  d.rows=d.rows.map(r=>({name:r.name,v:Array(d.heads.length).fill("")}));
+  sel=null;
+  render();
+  sync();
+}
+
+function addRow(){
+  if(mode!=="n"){alert("Switch to Normal Dominoes first");return;}
+  n.rows.push({name:String(n.rows.length+1),v:["",""]});
+  render();
+  sync();
+}
+
+function delRow(i){
+  lastDel={i:i,row:JSON.parse(JSON.stringify(n.rows[i]))};
+  n.rows.splice(i,1);
+  render();
+  sync();
+}
+
+function undoDel(){
+  if(!lastDel){alert("Nothing to undo");return;}
+  n.rows.splice(lastDel.i,0,lastDel.row);
+  lastDel=null;
+  render();
+  sync();
+}
+
+document.addEventListener("input",e=>{
+  const t=e.target;
+  if(t.id==="chName")ch.name=t.value;
+  else if(t.dataset.ch!==undefined)ch.heads[Number(t.dataset.ch)]=t.value;
+  else if(t.dataset.n!==undefined)n.heads[Number(t.dataset.n)]=t.value;
+  else if(t.id==="nName"){n.name="Double 6?";t.value="Double 6?";}
+  render();
+  sync();
+});
+
+function totals(d){
+  const t=Array(d.heads.length).fill(0);
+  d.rows.forEach(r=>r.v.forEach((x,i)=>t[i]+=Number(x)||0));
+  return t;
+}
+
+function makeImg(){
+  return new Promise(res=>{
+    const d=activeData();
+    const tot=totals(d);
+    const rk=ranks(tot);
+    const cols=d.heads.length+1;
+    const cw=150,rh=64,w=cols*cw,h=(d.rows.length+4)*rh+80;
+    const can=document.createElement("canvas");
+    can.width=w*2;can.height=h*2;
+    const ctx=can.getContext("2d");
+    ctx.scale(2,2);
+    ctx.fillStyle="#f7f7f7";ctx.fillRect(0,0,w,h);
+    ctx.font="bold 28px Arial";ctx.textAlign="center";ctx.fillStyle="#000";
+    ctx.fillText("Dominoes Scorekeeper",w/2,42);
+    let y=70;
+    function cell(x,y,txt,bg="#fff",red=false){
+      ctx.fillStyle=bg;ctx.fillRect(x,y,cw,rh);
+      ctx.strokeStyle="#111";ctx.strokeRect(x,y,cw,rh);
+      ctx.fillStyle=red?"red":"#000";
+      ctx.font="bold 22px Arial";ctx.textBaseline="middle";
+      ctx.fillText(String(txt||""),x+cw/2,y+rh/2);
+    }
+    cell(0,y,d.name,"#fff",true);
+    d.heads.forEach((hh,i)=>cell((i+1)*cw,y,hh));
+    y+=rh;
+    d.rows.forEach((r,ri)=>{
+      cell(0,y,mode==="n"?ri+1:r.name,"#fff",true);
+      r.v.forEach((v,i)=>cell((i+1)*cw,y,v,mode==="n"&&Number(v)>=5?"#bbf7d0":"#fff"));
+      y+=rh;
+    });
+    cell(0,y,"TOTAL","#eee");
+    const mn=Math.min(...tot),mx=Math.max(...tot);
+    tot.forEach((x,i)=>{
+      const ratio=mx===mn?0.5:(x-mn)/(mx-mn);
+      const hue=mode==="n"?ratio*120:120-ratio*120;
+      cell((i+1)*cw,y,x,`hsl(${hue},85%,78%)`);
+    });
+    y+=rh;
+    cell(0,y,"RANK","#f8fafc");
+    rk.forEach((x,i)=>cell((i+1)*cw,y,suffix(x),x===1?"#dcfce7":"#f8fafc"));
+    can.toBlob(b=>res(b),"image/png");
+  });
+}
+
+async function downloadImg(){
+  const b=await makeImg();
+  const u=URL.createObjectURL(b);
+  const a=document.createElement("a");
+  a.href=u;
+  a.download="dominoes_"+Date.now()+".png";
+  a.click();
+  URL.revokeObjectURL(u);
+}
+
+async function shareImg(){
+  const b=await makeImg();
+  const f=new File([b],"dominoes.png",{type:"image/png"});
+  if(navigator.canShare && navigator.canShare({files:[f]})){
+    await navigator.share({files:[f],title:"Dominoes Scorekeeper"});
+  }else{
+    downloadImg();
+  }
+}
+
+function loadLocal(){
+  const saved=localStorage.getItem("dominoes_v49_local") || localStorage.getItem("dominoes_v48_local") || localStorage.getItem("dominoes_v47");
+  if(saved){
+    try{
+      const s=JSON.parse(saved);
+      ch=s.ch||ch;
+      n=s.n||n;
+      mode=s.mode||mode;
+      n.name="Double 6?";
+    }catch(e){}
+  }
+  modeSet(mode,false);
+}
+
+loadLocal();
+
+const p=new URLSearchParams(location.search).get("room");
+if(p){
+  document.getElementById("room").value=p.toUpperCase();
+  setTimeout(joinRoom,500);
+}
+</script>
+</body>
+</html>
