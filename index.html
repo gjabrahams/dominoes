@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dominoes Scorekeeper v51 Online</title>
+<style>
+body{font-family:Arial;margin:0;background:#f7f7f7}h2{text-align:center}.box{background:#fff;border:2px solid #111;border-radius:10px;margin:8px;padding:8px}
+.tabs,.btns,.quick{display:grid;gap:8px;margin:8px}.tabs{grid-template-columns:1fr 1fr}.quick{grid-template-columns:repeat(3,1fr)}.btns{grid-template-columns:repeat(3,1fr)}
+button{min-height:48px;border-radius:10px;border:1px solid #ccc;background:#fff;color:#143d86;font-weight:bold}.active,.blue{background:#4388df!important;color:#fff}.green{background:#16a34a!important;color:#fff}.red{background:#ef4444!important;color:#fff}.orange{background:#f59e0b!important;color:#fff}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{border:2px solid #111;text-align:center;height:52px;font-size:18px}thead th{position:sticky;top:0;background:#fff;z-index:2}
+input{width:100%;height:100%;border:0;text-align:center;font-size:18px;background:transparent}.num{color:red;font-weight:bold}.sel{outline:4px solid #4388df;outline-offset:-4px}.hide{display:none}.small{text-align:center;color:#666;font-size:12px}.room-ok{background:#dcfce7;color:#166534;border:2px solid #16a34a;border-radius:8px;padding:8px;font-weight:bold}.room-bad{background:#fee2e2;color:#991b1b;border:2px solid #ef4444;border-radius:8px;padding:8px;font-weight:bold}
+</style></head><body>
+<h2>Dominoes Scorekeeper</h2>
+<div class="box"><b>Online Shared Room</b><div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px"><input id="room" placeholder="Room code e.g. FAMILY01"><button class="blue" onclick="joinRoom()">Join</button></div><div class="btns"><button onclick="newRoom()">New Room</button><button onclick="copyLink()">Copy Link</button><button onclick="saveNow()">Save</button></div><div id="status" class="small room-bad">🔴 Not in a room — local only</div></div>
+<div class="tabs"><button id="tabC" class="active" onclick="modeSet('c')">Dominoes Scorekeeper</button><button id="tabN" onclick="modeSet('n')">Normal Dominoes</button></div>
+<div id="chinese"><table><thead><tr><th><input id="chName" value="Chinese"></th><th><input data-ch="0" value="P1"></th><th><input data-ch="1" value="P2"></th><th><input data-ch="2" value="P3"></th><th><input data-ch="3" value="P4"></th></tr></thead><tbody id="chBody"></tbody><tfoot><tr><td>Total</td><td id="ct0">0</td><td id="ct1">0</td><td id="ct2">0</td><td id="ct3">0</td></tr><tr><td>Rank</td><td id="cr0">-</td><td id="cr1">-</td><td id="cr2">-</td><td id="cr3">-</td></tr></tfoot></table></div>
+<div id="normal" class="hide"><table><thead><tr><th><input id="nName" value="Double 6?"></th><th><input data-n="0" value="Team 1"></th><th><input data-n="1" value="Team 2"></th><th>Del</th></tr></thead><tbody id="nBody"></tbody><tfoot><tr><td>Total</td><td id="nt0">0</td><td id="nt1">0</td><td></td></tr><tr><td>Rank</td><td id="nr0">-</td><td id="nr1">-</td><td></td></tr></tfoot></table></div>
+<div class="quick"><button onclick="dig(0)">0</button><button onclick="dig(1)">1</button><button onclick="dig(2)">2</button><button onclick="dig(3)">3</button><button onclick="dig(4)">4</button><button onclick="dig(5)">5</button><button onclick="dig(6)">6</button><button onclick="dig(7)">7</button><button onclick="dig(8)">8</button><button onclick="dig(9)">9</button><button onclick="back()">⌫</button><button class="red" onclick="cellClear()">Clear</button></div>
+<div class="btns"><button onclick="clearTab()">Clear Tab</button><button onclick="addRow()">Add Row</button><button class="orange" onclick="undoDel()">Undo</button><button class="green" onclick="shareImg()">Share</button><button class="blue" onclick="downloadImg()">Download</button></div>
+<div class="small">Version 51 Online Rooms Fixed</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import{getDatabase,ref,set,onValue}from"https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+const firebaseConfig={apiKey:"PASTE_YOUR_API_KEY_HERE",authDomain:"PASTE_YOUR_PROJECT.firebaseapp.com",databaseURL:"https://PASTE_YOUR_PROJECT-default-rtdb.firebaseio.com",projectId:"PASTE_YOUR_PROJECT",storageBucket:"PASTE_YOUR_PROJECT.appspot.com",messagingSenderId:"PASTE_YOUR_SENDER_ID",appId:"PASTE_YOUR_APP_ID"};
+let app,db,rref,online=false,sup=false,currentRoom='';try{app=initializeApp(firebaseConfig);db=getDatabase(app)}catch(e){console.log(e)}
+let mode="c",sel=null,lastDel=null;
+let ch={name:"Chinese",heads:["P1","P2","P3","P4"],rows:[6,5,4,3,2,1,0].map(x=>({name:String(x),v:["","","",""]}))};
+let n={name:"Double 6?",heads:["Team 1","Team 2"],rows:[1,2,3,4,5].map(x=>({name:String(x),v:["",""]}))};
+function state(){return{mode,ch,n,t:Date.now()}}function sync(){
+localStorage.setItem("dominoes_v51_local",JSON.stringify(state()));
+if(online && !sup && rref && currentRoom){
+  set(rref,state());
+}
+}
+window.joinRoom=()=>{let code=room.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");if(!code)return alert("Enter room code");if(!db)return alert("Add Firebase config first");currentRoom=code;rref=ref(db,"rooms/"+currentRoom);online=true;status.className="small room-ok";status.innerText="🟢 Joined room: "+currentRoom;onValue(rref,s=>{let d=s.val();if(d){sup=true;mode=d.mode||mode;ch=d.ch||ch;n=d.n||n;n.name="Double 6?";render();sup=false}else set(rref,state())});let u=new URL(location.href);u.searchParams.set("room",currentRoom);history.replaceState(null,"",u)}
+window.newRoom=()=>{room.value="ROOM"+Math.floor(100000+Math.random()*900000);joinRoom()}
+window.copyLink=async()=>{let code=currentRoom || room.value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"");if(!code)return alert("Join or create a room first");let u=new URL(location.href);u.searchParams.set("room",code);await navigator.clipboard.writeText(u.toString());alert("Room link copied: "+code)}
+window.saveNow=()=>{sync();alert(online?"Saved online":"Saved local")}
+function ranks(a){let s=a.map((score,i)=>({score,i})).sort((x,y)=>x.score-y.score),r=[];let cr=1;for(let i=0;i<s.length;i++){if(i&&s[i].score!==s[i-1].score)cr=i+1;r[s[i].i]=cr}return r}
+function suff(x){return x==1?"1st":x==2?"2nd":x==3?"3rd":x+"th"}
+function colour(el,val,min,max,rev){let ratio=max==min?.5:(val-min)/(max-min),h=rev?ratio*120:120-ratio*120;el.style.background=`hsl(${h},85%,78%)`}
+function calc(prefix,data,rev){let t=Array(data.heads.length).fill(0);data.rows.forEach(r=>r.v.forEach((x,i)=>t[i]+=Number(x)||0));let mn=Math.min(...t),mx=Math.max(...t),rk=ranks(t);t.forEach((x,i)=>{let e=document.getElementById(prefix+"t"+i),rr=document.getElementById(prefix+"r"+i);e.textContent=x;colour(e,x,mn,mx,rev);rr.textContent=suff(rk[i]);rr.style.color=rk[i]==1?"green":"#111";e.style.boxShadow=rk[i]==1?"inset 0 0 0 4px #16a34a":"none"})}
+function render(){chName.value=ch.name;document.querySelectorAll("[data-ch]").forEach(e=>e.value=ch.heads[e.dataset.ch]);chBody.innerHTML="";ch.rows.forEach((r,ri)=>{let tr=document.createElement("tr");tr.innerHTML="<td class=num>"+r.name+"</td>"+ch.heads.map((_,ci)=>`<td id="c-${ri}-${ci}" onclick="pick('c',${ri},${ci})"><input readonly value="${r.v[ci]||''}"></td>`).join("");chBody.appendChild(tr)});calc("c",ch,false);
+n.name="Double 6?";nName.value="Double 6?";document.querySelectorAll("[data-n]").forEach(e=>e.value=n.heads[e.dataset.n]);nBody.innerHTML="";n.rows.forEach((r,ri)=>{let tr=document.createElement("tr");tr.innerHTML="<td class=num>"+(ri+1)+"</td>"+n.heads.map((_,ci)=>`<td id="n-${ri}-${ci}" onclick="pick('n',${ri},${ci})" style="${Number(r.v[ci])>=5?'background:#bbf7d0':''}"><input readonly value="${r.v[ci]||''}"></td>`).join("")+`<td><button class=red onclick="delRow(${ri})">×</button></td>`;nBody.appendChild(tr)});calc("n",n,true);highlight();sync()}
+window.modeSet=m=>{mode=m;chinese.classList.toggle("hide",m!="c");normal.classList.toggle("hide",m!="n");tabC.classList.toggle("active",m=="c");tabN.classList.toggle("active",m=="n");sel=null;render()}
+window.pick=(m,r,c)=>{sel={m,r,c};highlight()}
+function highlight(){document.querySelectorAll("td").forEach(x=>x.classList.remove("sel"));if(sel){let e=document.getElementById(`${sel.m}-${sel.r}-${sel.c}`);if(e)e.classList.add("sel")}}
+function active(){return mode=="c"?ch:n}
+window.dig=x=>{if(!sel||sel.m!=mode)return alert("Tap a score cell first");let d=active(),cur=String(d.rows[sel.r].v[sel.c]||"");if(cur.length<3)d.rows[sel.r].v[sel.c]=cur+x;render()}
+window.back=()=>{if(!sel||sel.m!=mode)return alert("Tap a score cell first");let d=active(),cur=String(d.rows[sel.r].v[sel.c]||"");d.rows[sel.r].v[sel.c]=cur.slice(0,-1);render()}
+window.cellClear=()=>{if(!sel||sel.m!=mode)return alert("Tap a score cell first");active().rows[sel.r].v[sel.c]="";render()}
+window.clearTab=()=>{active().rows=active().rows.map(r=>({name:r.name,v:Array(active().heads.length).fill("")}));sel=null;render()}
+window.addRow=()=>{if(mode!="n")return alert("Switch to Normal Dominoes first");n.rows.push({name:String(n.rows.length+1),v:["",""]});render()}
+window.delRow=i=>{lastDel={i,row:JSON.parse(JSON.stringify(n.rows[i]))};n.rows.splice(i,1);render()}
+window.undoDel=()=>{if(!lastDel)return alert("Nothing to undo");n.rows.splice(lastDel.i,0,lastDel.row);lastDel=null;render()}
+document.addEventListener("input",e=>{let t=e.target;if(t.id=="chName")ch.name=t.value;else if(t.dataset.ch!==undefined)ch.heads[t.dataset.ch]=t.value;else if(t.dataset.n!==undefined)n.heads[t.dataset.n]=t.value;render()})
+function totals(d){let t=Array(d.heads.length).fill(0);d.rows.forEach(r=>r.v.forEach((x,i)=>t[i]+=Number(x)||0));return t}
+function makeImg(){return new Promise(res=>{let d=active(),tot=totals(d),rk=ranks(tot),cols=d.heads.length+1,cw=150,rh=64,w=cols*cw,h=(d.rows.length+4)*rh+80,can=document.createElement("canvas");can.width=w*2;can.height=h*2;let ctx=can.getContext("2d");ctx.scale(2,2);ctx.fillStyle="#f7f7f7";ctx.fillRect(0,0,w,h);ctx.font="bold 28px Arial";ctx.textAlign="center";ctx.fillStyle="#000";ctx.fillText("Dominoes Scorekeeper",w/2,42);let y=70;function cell(x,y,txt,bg="#fff",red=false){ctx.fillStyle=bg;ctx.fillRect(x,y,cw,rh);ctx.strokeStyle="#111";ctx.strokeRect(x,y,cw,rh);ctx.fillStyle=red?"red":"#000";ctx.font="bold 22px Arial";ctx.textBaseline="middle";ctx.fillText(String(txt||""),x+cw/2,y+rh/2)}cell(0,y,d.name,"#fff",true);d.heads.forEach((hh,i)=>cell((i+1)*cw,y,hh));y+=rh;d.rows.forEach((r,ri)=>{cell(0,y,mode=="n"?ri+1:r.name,"#fff",true);r.v.forEach((v,i)=>cell((i+1)*cw,y,v,mode=="n"&&Number(v)>=5?"#bbf7d0":"#fff"));y+=rh});cell(0,y,"TOTAL","#eee");let mn=Math.min(...tot),mx=Math.max(...tot);tot.forEach((x,i)=>{let ratio=mx==mn?.5:(x-mn)/(mx-mn),hue=mode=="n"?ratio*120:120-ratio*120;cell((i+1)*cw,y,x,`hsl(${hue},85%,78%)`)});y+=rh;cell(0,y,"RANK","#f8fafc");rk.forEach((x,i)=>cell((i+1)*cw,y,suff(x),x==1?"#dcfce7":"#f8fafc"));can.toBlob(b=>res(b),"image/png")})}
+window.downloadImg=async()=>{let b=await makeImg(),u=URL.createObjectURL(b),a=document.createElement("a");a.href=u;a.download="dominoes_"+Date.now()+".png";a.click();URL.revokeObjectURL(u)}
+window.shareImg=async()=>{let b=await makeImg(),f=new File([b],"dominoes.png",{type:"image/png"});if(navigator.canShare&&navigator.canShare({files:[f]}))await navigator.share({files:[f],title:"Dominoes Scorekeeper"});else downloadImg()}
+let saved=localStorage.getItem("dominoes_v51_local") || localStorage.getItem("dominoes_v47");if(saved){try{let s=JSON.parse(saved);ch=s.ch||ch;n=s.n||n;mode=s.mode||mode}catch(e){}}
+modeSet(mode);let p=new URLSearchParams(location.search).get("room");if(p){room.value=p.toUpperCase();setTimeout(joinRoom,500)}
+</script></body></html>
